@@ -1,154 +1,110 @@
 package ru.sbt.jschool.session2;
 
-import java.io.PrintStream;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
+import ru.sbt.jschool.session2.printers.*;
+
+import java.util.*;
 
 public class OutputFormatter {
-    private final PrintStream out;
 
-    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd.MM.yyyy");
+    private final Map<Class<?>, Printer> knownPrinters = new HashMap<>();
 
-    private static final DecimalFormat MONEY_FORMAT;
-    private static final DecimalFormat NUMBER_FORMAT;
+    private final Printer anyPrinter = new Printer() {
+        @Override
+        public List<Class<?>> supported() {
+            return Collections.emptyList();
+        }
 
-    static {
-        DecimalFormatSymbols symbols = new DecimalFormatSymbols(new Locale("ru", "RU"));
-        symbols.setGroupingSeparator(' ');
-        symbols.setDecimalSeparator(',');
+        @Override
+        public int length(Object obj) {
+            return print(obj).length();
+        }
 
-        MONEY_FORMAT = new DecimalFormat("#,##0.00", symbols);
-        MONEY_FORMAT.setGroupingUsed(true);
+        @Override
+        public String print(Object obj) {
+            return obj == null ? "-" : obj.toString();
+        }
+    };
 
-        NUMBER_FORMAT = new DecimalFormat("#,###", symbols);
-        NUMBER_FORMAT.setGroupingUsed(true);
+    public OutputFormatter() {
+        List<Printer> printers = List.of(
+                new StringPrinter(),
+                new DatePrinter(),
+                new DoublePrinter(),
+                new NumberPrinter()
+        );
+
+        for (Printer printer : printers) {
+            for (Class<?> clazz : printer.supported()) {
+                knownPrinters.put(clazz, printer);
+            }
+        }
     }
 
-    public OutputFormatter(PrintStream out) {
-        this.out = out;
+    private Printer printerFor(Object obj) {
+        if (obj == null) return anyPrinter;
+        return knownPrinters.getOrDefault(obj.getClass(), anyPrinter);
     }
 
-    public void output(String[] names, Object[][] data) {
-        if (names == null || data == null) {
-            throw new IllegalArgumentException("Column names and data must not be null");
+    public void printTable(List<String> headers, List<List<Object>> rows) {
+        int columns = headers.size();
+        int[] colWidths = new int[columns];
+
+        // Считаем максимальную ширину по каждому столбцу
+        for (int i = 0; i < columns; i++) {
+            colWidths[i] = headers.get(i).length();
         }
 
-        int colCount = names.length;
-        int rowCount = data.length;
-
-        Class<?>[] types = new Class<?>[colCount];
-        for (int c = 0; c < colCount; c++) {
-            types[c] = inferColumnType(data, c);
-        }
-
-        int[] colWidths = new int[colCount];
-        for (int c = 0; c < colCount; c++) {
-            colWidths[c] = names[c].length();
-        }
-
-        String[][] formattedData = new String[rowCount][colCount];
-        for (int r = 0; r < rowCount; r++) {
-            for (int c = 0; c < colCount; c++) {
-                String formatted = formatCell(data[r][c], types[c]);
-                formattedData[r][c] = formatted;
-                if (formatted.length() > colWidths[c]) {
-                    colWidths[c] = formatted.length();
-                }
+        for (List<Object> row : rows) {
+            for (int i = 0; i < columns; i++) {
+                Object value = row.get(i);
+                Printer printer = printerFor(value);
+                colWidths[i] = Math.max(colWidths[i], printer.length(value));
             }
         }
 
-        printBorder(colWidths);
+        // Формируем разделители
+        String border = buildBorder(colWidths);
+        System.out.println(border);
 
-        out.print("|");
-        for (int c = 0; c < colCount; c++) {
-            out.print(center(names[c], colWidths[c]));
-            out.print("|");
+        // Заголовки
+        System.out.print("|");
+        for (int i = 0; i < columns; i++) {
+            String header = headers.get(i);
+            int width = colWidths[i];
+            int padLeft = (width - header.length()) / 2;
+            int padRight = width - header.length() - padLeft;
+            System.out.print(" " + " ".repeat(padLeft) + header + " ".repeat(padRight) + " |");
         }
-        out.println();
+        System.out.println();
+        System.out.println(border);
 
-        printBorder(colWidths);
+        // Данные
+        for (List<Object> row : rows) {
+            System.out.print("|");
+            for (int i = 0; i < columns; i++) {
+                Object value = row.get(i);
+                Printer printer = printerFor(value);
+                String text = printer.print(value);
+                int width = colWidths[i];
+                int pad = width - text.length();
 
-        for (int r = 0; r < rowCount; r++) {
-            out.print("|");
-            for (int c = 0; c < colCount; c++) {
-                String cell = formattedData[r][c];
-                if (types[c] == String.class) {
-                    out.print(leftAlign(cell, colWidths[c]));
+                // Строки — влево, остальное — вправо
+                if (value instanceof String) {
+                    System.out.print(" " + text + " ".repeat(pad) + " |");
                 } else {
-                    out.print(rightAlign(cell, colWidths[c]));
+                    System.out.print(" " + " ".repeat(pad) + text + " |");
                 }
-                out.print("|");
             }
-            out.println();
-            printBorder(colWidths);
+            System.out.println();
+            System.out.println(border);
         }
     }
 
-    private Class<?> inferColumnType(Object[][] data, int colIndex) {
-        for (Object[] row : data) {
-            Object val = row[colIndex];
-            if (val != null) {
-                if (val instanceof Date) return Date.class;
-                if (val instanceof Float || val instanceof Double) return Double.class;
-                if (val instanceof Integer || val instanceof Long || val instanceof Short || val instanceof Byte)
-                    return Long.class;
-                return String.class;
-            }
-        }
-        return String.class;
-    }
-
-    private String formatCell(Object value, Class<?> type) {
-        if (value == null) {
-            return "-";
-        }
-        if (type == String.class) {
-            return value.toString().replace("\n", " ");
-        } else if (type == Date.class) {
-            return DATE_FORMAT.format((Date) value);
-        } else if (type == Double.class) {
-            double d = ((Number) value).doubleValue();
-            return MONEY_FORMAT.format(d);
-        } else if (type == Long.class) {
-            long l = ((Number) value).longValue();
-            return NUMBER_FORMAT.format(l);
-        } else {
-            return value.toString();
-        }
-    }
-
-    private void printBorder(int[] colWidths) {
-        out.print("+");
+    private String buildBorder(int[] colWidths) {
+        StringBuilder sb = new StringBuilder("+");
         for (int w : colWidths) {
-            for (int i = 0; i < w; i++) out.print("-");
-            out.print("+");
+            sb.append("-".repeat(w + 2)).append("+");
         }
-        out.println();
-    }
-
-    private String center(String s, int w) {
-        if (s.length() >= w) return s;
-        int leftPadding = (w - s.length()) / 2;
-        int rightPadding = w - s.length() - leftPadding;
-        return repeat(' ', leftPadding) + s + repeat(' ', rightPadding);
-    }
-
-    private String leftAlign(String s, int w) {
-        if (s.length() >= w) return s;
-        return s + repeat(' ', w - s.length());
-    }
-
-    private String rightAlign(String s, int w) {
-        if (s.length() >= w) return s;
-        return repeat(' ', w - s.length()) + s;
-    }
-
-    private String repeat(char ch, int count) {
-        char[] arr = new char[count];
-        for (int i = 0; i < count; i++) arr[i] = ch;
-        return new String(arr);
+        return sb.toString();
     }
 }
