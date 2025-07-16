@@ -10,7 +10,7 @@ public class DoublePrinter implements Printer {
     public DoublePrinter() {
         DecimalFormatSymbols symbols = new DecimalFormatSymbols();
         symbols.setGroupingSeparator(' ');
-        symbols.setDecimalSeparator('.');
+        symbols.setDecimalSeparator(',');
         this.format = new DecimalFormat("#,##0.00", symbols);
     }
 

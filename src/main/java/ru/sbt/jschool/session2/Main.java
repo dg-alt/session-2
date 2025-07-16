@@ -1,11 +1,12 @@
 package ru.sbt.jschool.session2;
 
+import java.io.PrintStream;
 import java.util.*;
 import java.util.Date;
 
 public class Main {
     public static void main(String[] args) {
-        OutputFormatter formatter = new OutputFormatter();
+        OutputFormatter formatter = new OutputFormatter(System.out);
 
         List<String> headers = Arrays.asList("#", "DATE", "MONEY", "STRING");
         List<List<Object>> rows = Arrays.asList(

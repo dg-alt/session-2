@@ -2,10 +2,11 @@ package ru.sbt.jschool.session2;
 
 import ru.sbt.jschool.session2.printers.*;
 
+import java.io.PrintStream;
 import java.util.*;
 
 public class OutputFormatter {
-
+    private final PrintStream out;  // Поток для вывода
     private final Map<Class<?>, Printer> knownPrinters = new HashMap<>();
 
     private final Printer anyPrinter = new Printer() {
@@ -25,7 +26,9 @@ public class OutputFormatter {
         }
     };
 
-    public OutputFormatter() {
+    public OutputFormatter(PrintStream out) {
+        this.out = out;
+
         List<Printer> printers = List.of(
                 new StringPrinter(),
                 new DatePrinter(),
@@ -49,62 +52,82 @@ public class OutputFormatter {
         int columns = headers.size();
         int[] colWidths = new int[columns];
 
-        // Считаем максимальную ширину по каждому столбцу
+        // Считаем максимальную ширину по каждому столбцу (для заголовков и данных)
         for (int i = 0; i < columns; i++) {
-            colWidths[i] = headers.get(i).length();
+            colWidths[i] = headers.get(i).length(); // Начальная ширина для столбца - это длина заголовка
         }
 
+        // Пробежимся по данным и обновим максимальную ширину столбцов
         for (List<Object> row : rows) {
             for (int i = 0; i < columns; i++) {
                 Object value = row.get(i);
                 Printer printer = printerFor(value);
-                colWidths[i] = Math.max(colWidths[i], printer.length(value));
+                int valueLength = printer.length(value);
+                colWidths[i] = Math.max(colWidths[i], valueLength); // Обновляем ширину столбца
             }
         }
 
-        // Формируем разделители
+        // --- Вот важный блок: определяем тип принтера для каждого столбца по первому ненулевому значению ---
+        Printer[] columnPrinters = new Printer[columns];
+        for (int i = 0; i < columns; i++) {
+            columnPrinters[i] = anyPrinter; // По умолчанию
+            for (List<Object> row : rows) {
+                Object value = row.get(i);
+                if (value != null) {
+                    columnPrinters[i] = printerFor(value);
+                    break; // нашли тип — дальше не ищем
+                }
+            }
+        }
+
+        // Формируем разделитель
         String border = buildBorder(colWidths);
-        System.out.println(border);
+        out.println(border);
 
         // Заголовки
-        System.out.print("|");
+        out.print("|");
         for (int i = 0; i < columns; i++) {
             String header = headers.get(i);
             int width = colWidths[i];
             int padLeft = (width - header.length()) / 2;
             int padRight = width - header.length() - padLeft;
-            System.out.print(" " + " ".repeat(padLeft) + header + " ".repeat(padRight) + " |");
+            // Форматируем заголовок с пробелами по обеим сторонам
+            out.print(" ".repeat(padLeft) + header + " ".repeat(padRight) + "|");
         }
-        System.out.println();
-        System.out.println(border);
+        out.println();
+        out.println(border);
 
         // Данные
         for (List<Object> row : rows) {
-            System.out.print("|");
+            out.print("|");
             for (int i = 0; i < columns; i++) {
                 Object value = row.get(i);
-                Printer printer = printerFor(value);
+                Printer printer = columnPrinters[i];  // Используем принтер столбца!
                 String text = printer.print(value);
                 int width = colWidths[i];
                 int pad = width - text.length();
 
-                // Строки — влево, остальное — вправо
-                if (value instanceof String) {
-                    System.out.print(" " + text + " ".repeat(pad) + " |");
+                // Выровняем в зависимости от типа столбца
+                if (printer instanceof StringPrinter) {
+                    // Для строк — слева, добавляем пробелы справа
+                    out.print(text + " ".repeat(pad) + "|");
                 } else {
-                    System.out.print(" " + " ".repeat(pad) + text + " |");
+                    // Для чисел и дат — справа, добавляем пробелы слева
+                    out.print(" ".repeat(pad) + text + "|");
                 }
             }
-            System.out.println();
-            System.out.println(border);
+            out.println();
+            out.println(border);
         }
     }
+
 
     private String buildBorder(int[] colWidths) {
         StringBuilder sb = new StringBuilder("+");
         for (int w : colWidths) {
-            sb.append("-".repeat(w + 2)).append("+");
+            sb.append("-".repeat(w)).append("+"); // Убираем лишние пробелы и добавляем только w
         }
         return sb.toString();
     }
+
 }
