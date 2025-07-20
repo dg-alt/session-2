@@ -6,4 +6,6 @@ public interface Printer {
     List<Class<?>> supported();
     int length(Object obj);
     String print(Object obj);
+
+    boolean isPaddingRight();
 }

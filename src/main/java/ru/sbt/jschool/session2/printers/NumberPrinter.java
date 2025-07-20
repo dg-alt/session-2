@@ -18,11 +18,22 @@ public class NumberPrinter implements Printer {
     }
 
     public int length(Object obj) {
-        return print(obj).length();
+        if (obj == null) return 1;  // Для null можно вернуть 1 (символ "-")
+
+        long value = ((Number) obj).longValue();
+        if (value == 0) return 3;  // "-0" — это минимальная длина
+
+        // Для более длинных чисел вычислим длину через логарифм
+        return (int) Math.log10(Math.abs(value)) + 1;
     }
 
     public String print(Object obj) {
         if (obj == null) return "-";
         return format.format(((Number) obj).longValue());
+    }
+
+    @Override
+    public boolean isPaddingRight() {
+        return true;  // Числа выравниваются по правому краю
     }
 }

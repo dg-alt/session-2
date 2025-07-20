@@ -1,119 +1,82 @@
 package ru.sbt.jschool.session2;
 
+import java.io.PrintStream;
+import java.util.Arrays;
+import java.util.List;
+
 import ru.sbt.jschool.session2.printers.*;
 
-import java.io.PrintStream;
-import java.util.*;
-
 public class OutputFormatter {
-    private final PrintStream out;  // Поток для вывода
-    private final Map<Class<?>, Printer> knownPrinters = new HashMap<>();
-
-    private final Printer anyPrinter = new Printer() {
-        @Override
-        public List<Class<?>> supported() {
-            return Collections.emptyList();
-        }
-
-        @Override
-        public int length(Object obj) {
-            return print(obj).length();
-        }
-
-        @Override
-        public String print(Object obj) {
-            return obj == null ? "-" : obj.toString();
-        }
-    };
+    private PrintStream out;
 
     public OutputFormatter(PrintStream out) {
         this.out = out;
-
-        List<Printer> printers = List.of(
-                new StringPrinter(),
-                new DatePrinter(),
-                new DoublePrinter(),
-                new NumberPrinter()
-        );
-
-        for (Printer printer : printers) {
-            for (Class<?> clazz : printer.supported()) {
-                knownPrinters.put(clazz, printer);
-            }
-        }
     }
 
-    private Printer printerFor(Object obj) {
-        if (obj == null) return anyPrinter;
-        return knownPrinters.getOrDefault(obj.getClass(), anyPrinter);
-    }
-
-    public void printTable(List<String> headers, List<List<Object>> rows) {
-        int columns = headers.size();
+    // Метод для вывода таблицы
+    public void output(String[] names, Object[][] data) {
+        // Считаем максимальную ширину для каждого столбца
+        int columns = names.length;
         int[] colWidths = new int[columns];
 
-        // Считаем максимальную ширину по каждому столбцу (для заголовков и данных)
+        // Определяем максимальную ширину для каждого столбца, включая заголовки
         for (int i = 0; i < columns; i++) {
-            colWidths[i] = headers.get(i).length(); // Начальная ширина для столбца - это длина заголовка
+            colWidths[i] = names[i].length();
         }
 
-        // Пробежимся по данным и обновим максимальную ширину столбцов
-        for (List<Object> row : rows) {
-            for (int i = 0; i < columns; i++) {
-                Object value = row.get(i);
-                Printer printer = printerFor(value);
-                int valueLength = printer.length(value);
-                colWidths[i] = Math.max(colWidths[i], valueLength); // Обновляем ширину столбца
-            }
-        }
-
-        // --- Вот важный блок: определяем тип принтера для каждого столбца по первому ненулевому значению ---
+        // Создаем массив принтеров для каждого столбца
         Printer[] columnPrinters = new Printer[columns];
         for (int i = 0; i < columns; i++) {
-            columnPrinters[i] = anyPrinter; // По умолчанию
-            for (List<Object> row : rows) {
-                Object value = row.get(i);
+            columnPrinters[i] = new StringPrinter();  // по умолчанию StringPrinter
+            for (Object[] row : data) {
+                Object value = row[i];
                 if (value != null) {
-                    columnPrinters[i] = printerFor(value);
-                    break; // нашли тип — дальше не ищем
+                    columnPrinters[i] = printerFor(value);  // находим принтер для первого ненулевого значения
+                    break; // как только нашли первый ненулевой элемент, хватит
                 }
             }
         }
 
-        // Формируем разделитель
+        // Определяем максимальную ширину для каждого столбца, включая данные
+        for (Object[] row : data) {
+            for (int i = 0; i < columns; i++) {
+                String value = formatValue(row[i], i);  // Передаем индекс столбца
+                colWidths[i] = Math.max(colWidths[i], value.length());
+            }
+        }
+
+        // Формируем границу таблицы
         String border = buildBorder(colWidths);
         out.println(border);
 
-        // Заголовки
+        // Печатаем заголовок
         out.print("|");
         for (int i = 0; i < columns; i++) {
-            String header = headers.get(i);
+            String header = names[i];
             int width = colWidths[i];
             int padLeft = (width - header.length()) / 2;
             int padRight = width - header.length() - padLeft;
-            // Форматируем заголовок с пробелами по обеим сторонам
             out.print(" ".repeat(padLeft) + header + " ".repeat(padRight) + "|");
         }
         out.println();
         out.println(border);
 
-        // Данные
-        for (List<Object> row : rows) {
+        // Печатаем данные
+        for (Object[] row : data) {
             out.print("|");
             for (int i = 0; i < columns; i++) {
-                Object value = row.get(i);
-                Printer printer = columnPrinters[i];  // Используем принтер столбца!
-                String text = printer.print(value);
+                String value = formatValue(row[i], i);  // Передаем индекс столбца
                 int width = colWidths[i];
-                int pad = width - text.length();
+                int pad = width - value.length();
 
-                // Выровняем в зависимости от типа столбца
+                Printer printer = columnPrinters[i]; // Получаем принтер для столбца
+                // Форматируем вывод данных в зависимости от типа
                 if (printer instanceof StringPrinter) {
-                    // Для строк — слева, добавляем пробелы справа
-                    out.print(text + " ".repeat(pad) + "|");
+                    // Строки выравниваем по левому краю
+                    out.print(value + " ".repeat(pad) + "|");
                 } else {
-                    // Для чисел и дат — справа, добавляем пробелы слева
-                    out.print(" ".repeat(pad) + text + "|");
+                    // Для чисел (в том числе дефиса) выравниваем по правому краю
+                    out.print(" ".repeat(pad) + value + "|");
                 }
             }
             out.println();
@@ -121,13 +84,37 @@ public class OutputFormatter {
         }
     }
 
+    // Метод для форматирования значения в строку
+    private String formatValue(Object value, int columnIndex) {
+        if (value == null) {
+            // Для строкового столбца дефис по левому краю
+            if (columnIndex == 0) {  // Столбец с названиями (например, "Город")
+                return "-";
+            }
+            // Для всех других столбцов дефис по правому краю
+            return "-";
+        }
 
+        Printer printer = printerFor(value); // Получаем принтер для типа данных
+        return printer.print(value);  // Форматируем значение
+    }
+
+    // Метод для построения границы таблицы
     private String buildBorder(int[] colWidths) {
         StringBuilder sb = new StringBuilder("+");
         for (int w : colWidths) {
-            sb.append("-".repeat(w)).append("+"); // Убираем лишние пробелы и добавляем только w
+            sb.append("-".repeat(w)).append("+");
         }
         return sb.toString();
     }
 
+    // Метод для получения принтера для типа данных
+    private Printer printerFor(Object obj) {
+        if (obj == null) return new StringPrinter(); // Возвращаем принтер для строк по умолчанию
+        // Возвращаем подходящий принтер для типа данных
+        if (obj instanceof Double) return new DoublePrinter();
+        if (obj instanceof Number) return new NumberPrinter();
+        if (obj instanceof java.util.Date) return new DatePrinter();
+        return new StringPrinter(); // Для строк
+    }
 }

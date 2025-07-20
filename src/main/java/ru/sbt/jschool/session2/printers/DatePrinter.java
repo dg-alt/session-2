@@ -12,11 +12,18 @@ public class DatePrinter implements Printer {
     }
 
     public int length(Object obj) {
-        return print(obj).length();
+        if (obj == null) return 1;  // Для null можно вернуть 1 (символ "-")
+
+        return sdf.format(obj).length();  // Мы точно знаем формат, и можем посчитать длину строки
     }
 
     public String print(Object obj) {
         if (obj == null) return "-";
         return sdf.format((Date) obj);
+    }
+
+    @Override
+    public boolean isPaddingRight() {
+        return true;  // Даты выравниваются по правому краю
     }
 }

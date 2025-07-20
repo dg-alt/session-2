@@ -15,6 +15,7 @@ public class Main {
                 Arrays.asList(3, null, 0.4, null)
         );
 
-        formatter.printTable(headers, rows);
+        // Вызов метода output, а не printTable
+        formatter.output(headers.toArray(new String[0]), rows.stream().map(r -> r.toArray()).toArray(Object[][]::new));
     }
 }
