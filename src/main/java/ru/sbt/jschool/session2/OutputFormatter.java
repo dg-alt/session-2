@@ -40,7 +40,7 @@ public class OutputFormatter {
         // Определяем максимальную ширину для каждого столбца, включая данные
         for (Object[] row : data) {
             for (int i = 0; i < columns; i++) {
-                String value = formatValue(row[i], i);  // Передаем индекс столбца
+                String value = formatValue(row[i], i);
                 colWidths[i] = Math.max(colWidths[i], value.length());
             }
         }
@@ -71,12 +71,12 @@ public class OutputFormatter {
 
                 Printer printer = columnPrinters[i]; // Получаем принтер для столбца
                 // Форматируем вывод данных в зависимости от типа
-                if (printer instanceof StringPrinter) {
-                    // Строки выравниваем по левому краю
-                    out.print(value + " ".repeat(pad) + "|");
-                } else {
-                    // Для чисел (в том числе дефиса) выравниваем по правому краю
+                if (printer.isPaddingRight()) {
+                    // Для числовых значений выравниваем по правому краю
                     out.print(" ".repeat(pad) + value + "|");
+                } else {
+                    // Для строковых значений выравниваем по левому краю
+                    out.print(value + " ".repeat(pad) + "|");
                 }
             }
             out.println();

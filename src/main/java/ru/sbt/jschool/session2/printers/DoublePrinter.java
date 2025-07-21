@@ -14,24 +14,34 @@ public class DoublePrinter implements Printer {
         this.format = new DecimalFormat("#,##0.00", symbols);
     }
 
+    @Override
     public List<Class<?>> supported() {
         return List.of(Double.class, Float.class);
     }
 
+    @Override
     public int length(Object obj) {
-        if (obj == null) return 1;  // Для null можно вернуть 1 (символ "-")
+        if (obj == null) return 1;  // Для null возвращаем 1 (символ "-")
 
         double value = ((Number) obj).doubleValue();
-        if (value == 0) return 4;  // "-0,00" — это минимальная длина
+        if (value == 0) return 4;  // "-0,00" — минимальная длина для 0
 
-        // Для более длинных чисел вычислим длину через логарифм
-        int integerPartLength = (int) Math.log10(Math.abs(value)) + 1;
-        return integerPartLength + 3;  // Дополнительные два знака для десятичной части и запятой
+        // Получаем целую часть
+        long integerPart = (long) Math.abs(value);
+        int integerLength = (int) Math.log10(integerPart) + 1;  // Длина целой части числа
+
+        // Параметры для десятичной части
+        int decimalLength = 3;  // Два знака после запятой + запятая
+
+        return integerLength + decimalLength;  // Длина числа с учетом десятичной части
     }
 
+    @Override
     public String print(Object obj) {
         if (obj == null) return "-";
-        return format.format(((Number) obj).doubleValue());
+
+        double value = ((Number) obj).doubleValue();
+        return format.format(value);  // Форматируем число с учетом десятичных знаков
     }
 
     @Override

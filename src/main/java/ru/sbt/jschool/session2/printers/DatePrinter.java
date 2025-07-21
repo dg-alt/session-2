@@ -5,18 +5,19 @@ import java.util.Date;
 import java.util.List;
 
 public class DatePrinter implements Printer {
-    private final SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");
+    private static final SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy");
 
+    @Override
     public List<Class<?>> supported() {
         return List.of(Date.class);
     }
 
+    @Override
     public int length(Object obj) {
-        if (obj == null) return 1;  // Для null можно вернуть 1 (символ "-")
-
-        return sdf.format(obj).length();  // Мы точно знаем формат, и можем посчитать длину строки
+        return 10;  // Статическая длина для даты в формате "dd.MM.yyyy"
     }
 
+    @Override
     public String print(Object obj) {
         if (obj == null) return "-";
         return sdf.format((Date) obj);
@@ -24,6 +25,6 @@ public class DatePrinter implements Printer {
 
     @Override
     public boolean isPaddingRight() {
-        return true;  // Даты выравниваются по правому краю
+        return true;  // Даты должны быть выровнены по правому краю
     }
 }

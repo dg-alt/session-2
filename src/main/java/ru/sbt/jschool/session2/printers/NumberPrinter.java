@@ -5,35 +5,40 @@ import java.text.DecimalFormatSymbols;
 import java.util.List;
 
 public class NumberPrinter implements Printer {
+
     private final DecimalFormat format;
 
     public NumberPrinter() {
         DecimalFormatSymbols symbols = new DecimalFormatSymbols();
-        symbols.setGroupingSeparator(' ');
-        this.format = new DecimalFormat("#,###", symbols);
+        symbols.setGroupingSeparator(' '); // Для разделения тысяч пробелом
+        symbols.setDecimalSeparator(',');  // Для разделителя десятичной части запятая
+        this.format = new DecimalFormat("#,##0", symbols); // Форматируем числа
     }
 
+    @Override
     public List<Class<?>> supported() {
-        return List.of(Integer.class, Long.class, Short.class);
+        return List.of(Number.class);
     }
 
+    @Override
     public int length(Object obj) {
-        if (obj == null) return 1;  // Для null можно вернуть 1 (символ "-")
+        if (obj == null) return 1;
 
-        long value = ((Number) obj).longValue();
-        if (value == 0) return 3;  // "-0" — это минимальная длина
-
-        // Для более длинных чисел вычислим длину через логарифм
-        return (int) Math.log10(Math.abs(value)) + 1;
+        // Преобразуем число в строку с нужным форматом, но без пробела
+        String formattedValue = format.format(obj);
+        return formattedValue.length(); // Длина строки с пробелами для тысяч
     }
 
+    @Override
     public String print(Object obj) {
         if (obj == null) return "-";
-        return format.format(((Number) obj).longValue());
+
+        // Форматируем число в строку с пробелами для тысяч
+        return format.format(obj);
     }
 
     @Override
     public boolean isPaddingRight() {
-        return true;  // Числа выравниваются по правому краю
+        return true;  // Числа всегда выравниваются по правому краю
     }
 }
